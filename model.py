@@ -14,7 +14,9 @@ from torch.nn.functional import l1_loss, mse_loss
 from torch.nn.functional import binary_cross_entropy_with_logits as bce_with_logits_loss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-
+import smtp
+import time
+from tqdm import tqdm
 
 
 class Encoder(nn.Module):
@@ -57,10 +59,10 @@ class Encoder(nn.Module):
     def forward(self, face):
         out = face
         for conv_layer in self.conv_layers:
-            #print("H")
+            # print("H")
             out = conv_layer(out)
-            #print(out.shape)
-            #print("W")
+            # print(out.shape)
+            # print("W")
         out = out.flatten(1, -1)
         out = self.fc_layer(out)
         return out
@@ -140,7 +142,8 @@ class DiscriminatorImg(nn.Module):
             out = conv_layer(out)
             if i == 1:
                 # concat labels after first conv
-                labels_tensor = torch.zeros(torch.Size((out.size(0), labels.size(1), out.size(2), out.size(3))), device=device)
+                labels_tensor = torch.zeros(torch.Size((out.size(0), labels.size(1), out.size(2), out.size(3))),
+                                            device=device)
                 for img_idx in range(out.size(0)):
                     for label in range(labels.size(1)):
                         labels_tensor[img_idx, label, :, :] = labels[img_idx, label]  # fill a square
@@ -205,14 +208,14 @@ class Generator(nn.Module):
                 if (isinstance(age, int) and isinstance(gender, int)) \
                 else torch.cat((age, gender), 1)
             out = torch.cat((out, label), 1)  # z_l
-        #print(out.shape)
+        # print(out.shape)
         out = self.fc(out)
-        #print(out.shape)
+        # print(out.shape)
         out = self._decompress(out)
-        #print(out.shape)
+        # print(out.shape)
         for i, deconv_layer in enumerate(self.deconv_layers, 1):
             out = deconv_layer(out)
-            #print(out.shape)
+            # print(out.shape)
         return out
 
 
@@ -285,7 +288,6 @@ class Net(object):
         print_timestamp("Saved test result to " + dest)
         return dest
 
-
     def test_single(self, image_tensor, age, gender, target, watermark):
 
         self.eval()
@@ -294,7 +296,8 @@ class Net(object):
 
         gender_tensor = -torch.ones(consts.NUM_GENDERS)
         gender_tensor[int(gender)] *= -1
-        gender_tensor = gender_tensor.repeat(consts.NUM_AGES, consts.NUM_AGES // consts.NUM_GENDERS)  # apply gender on all images
+        gender_tensor = gender_tensor.repeat(consts.NUM_AGES,
+                                             consts.NUM_AGES // consts.NUM_GENDERS)  # apply gender on all images
 
         age_tensor = -torch.ones(consts.NUM_AGES, consts.NUM_AGES)
         for i in range(consts.NUM_AGES):
@@ -307,7 +310,7 @@ class Net(object):
 
         if watermark:
             image_tensor = image_tensor.permute(1, 2, 0)
-            image_tensor = 255 * one_sided(image_tensor.numpy())
+            image_tensor = 255 * one_sided(image_tensor.cpu().numpy())
             image_tensor = np.ascontiguousarray(image_tensor, dtype=np.uint8)
             font = cv2.FONT_HERSHEY_SIMPLEX
             bottomLeftCornerOfText = (2, 25)
@@ -326,14 +329,13 @@ class Net(object):
             )
             image_tensor = two_sided(torch.from_numpy(image_tensor / 255.0)).float().permute(2, 0, 1)
 
-        joined = torch.cat((image_tensor.unsqueeze(0), generated), 0)
+        joined = torch.cat((image_tensor.unsqueeze(0), generated.cpu()), 0)
 
         joined = nn.ConstantPad2d(padding=4, value=-1)(joined)
         for img_idx in (0, Label.age_transform(age) + 1):
             for elem_idx in (0, 1, 2, 3, -4, -3, -2, -1):
                 joined[img_idx, :, elem_idx, :] = 1  # color border white
                 joined[img_idx, :, :, elem_idx] = 1  # color border white
-
 
         dest = os.path.join(target, 'menifa.png')
         save_image_normalized(tensor=joined, filename=dest, nrow=joined.size(0))
@@ -353,17 +355,20 @@ class Net(object):
             where_to_save=None,
             models_saving='always',
     ):
+        print("开始训练时间：")
+        start_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+        print(start_time)
         where_to_save = where_to_save or default_where_to_save()
         dataset = get_utkface_dataset(utkface_path)
         valid_size = valid_size or batch_size
         valid_dataset, train_dataset = torch.utils.data.random_split(dataset, (valid_size, len(dataset) - valid_size))
 
-        train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
-        valid_loader = DataLoader(dataset=valid_dataset, batch_size=batch_size, shuffle=False)
+        train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
+        valid_loader = DataLoader(dataset=valid_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
         idx_to_class = {v: k for k, v in dataset.class_to_idx.items()}
 
         input_output_loss = l1_loss
-        nrow = round((2 * batch_size)**0.5)
+        nrow = round((2 * batch_size) ** 0.5)
 
         # save_image_normalized(tensor=validate_images, filename=where_to_save+"/base.png")
 
@@ -378,7 +383,6 @@ class Net(object):
         save_count = 0
         paths_for_gif = []
 
-
         for epoch in range(1, epochs + 1):
             where_to_save_epoch = os.path.join(where_to_save, "epoch" + str(epoch))
             try:
@@ -387,82 +391,89 @@ class Net(object):
                 paths_for_gif.append(where_to_save_epoch)
                 losses = defaultdict(lambda: [])
                 self.train()  # move to train mode
-                for i, (images, labels) in enumerate(train_loader, 1):
+                with tqdm(train_loader) as _tqdm:
+                    for i, (images, labels) in enumerate(_tqdm, 1):
+                        # for i, (images, labels) in tqdm(enumerate(train_loader, 1)):
+                        images = images.to(device=self.device)
+                        labels = torch.stack([str_to_tensor(idx_to_class[l], normalize=True) for l in
+                                              list(labels.numpy())])  # todo - can remove list() ?
+                        labels = labels.to(device=self.device)
+                        # print ("DEBUG: iteration: "+str(i)+" images shape: "+str(images.shape))
+                        z = self.E(images)
 
-                    images = images.to(device=self.device)
-                    labels = torch.stack([str_to_tensor(idx_to_class[l], normalize=True) for l in list(labels.numpy())])  # todo - can remove list() ?
-                    labels = labels.to(device=self.device)
-                    # print ("DEBUG: iteration: "+str(i)+" images shape: "+str(images.shape))
-                    z = self.E(images)
+                        # Input\Output Loss
+                        z_l = torch.cat((z, labels), 1)
+                        generated = self.G(z_l)
+                        eg_loss = input_output_loss(generated, images)
+                        losses['eg'].append(eg_loss.item())
 
-                    # Input\Output Loss
-                    z_l = torch.cat((z, labels), 1)
-                    generated = self.G(z_l)
-                    eg_loss = input_output_loss(generated, images)
-                    losses['eg'].append(eg_loss.item())
+                        # Total Variance Regularization Loss
+                        reg = l1_loss(generated[:, :, :, :-1], generated[:, :, :, 1:]) + l1_loss(
+                            generated[:, :, :-1, :],
+                            generated[:, :, 1:, :])
 
-                    # Total Variance Regularization Loss
-                    reg = l1_loss(generated[:, :, :, :-1], generated[:, :, :, 1:]) + l1_loss(generated[:, :, :-1, :], generated[:, :, 1:, :])
+                        # reg = (
+                        #        torch.sum(torch.abs(generated[:, :, :, :-1] - generated[:, :, :, 1:])) +
+                        #        torch.sum(torch.abs(generated[:, :, :-1, :] - generated[:, :, 1:, :]))
+                        # ) / float(generated.size(0))
+                        reg_loss = 0 * reg
+                        reg_loss.to(self.device)
+                        losses['reg'].append(reg_loss.item())
 
-                    # reg = (
-                    #        torch.sum(torch.abs(generated[:, :, :, :-1] - generated[:, :, :, 1:])) +
-                    #        torch.sum(torch.abs(generated[:, :, :-1, :] - generated[:, :, 1:, :]))
-                    # ) / float(generated.size(0))
-                    reg_loss = 0 * reg
-                    reg_loss.to(self.device)
-                    losses['reg'].append(reg_loss.item())
+                        # DiscriminatorZ Loss
+                        z_prior = two_sided(torch.rand_like(z, device=self.device))  # [-1 : 1]
+                        d_z_prior = self.Dz(z_prior)
+                        d_z = self.Dz(z)
+                        dz_loss_prior = bce_with_logits_loss(d_z_prior, torch.ones_like(d_z_prior))
+                        dz_loss = bce_with_logits_loss(d_z, torch.zeros_like(d_z))
+                        dz_loss_tot = (dz_loss + dz_loss_prior)
+                        losses['dz'].append(dz_loss_tot.item())
 
-                    # DiscriminatorZ Loss
-                    z_prior = two_sided(torch.rand_like(z, device=self.device))  # [-1 : 1]
-                    d_z_prior = self.Dz(z_prior)
-                    d_z = self.Dz(z)
-                    dz_loss_prior = bce_with_logits_loss(d_z_prior, torch.ones_like(d_z_prior))
-                    dz_loss = bce_with_logits_loss(d_z, torch.zeros_like(d_z))
-                    dz_loss_tot = (dz_loss + dz_loss_prior)
-                    losses['dz'].append(dz_loss_tot.item())
+                        # Encoder\DiscriminatorZ Loss
+                        ez_loss = 0.0001 * bce_with_logits_loss(d_z, torch.ones_like(d_z))
+                        ez_loss.to(self.device)
+                        losses['ez'].append(ez_loss.item())
 
-                    # Encoder\DiscriminatorZ Loss
-                    ez_loss = 0.0001 * bce_with_logits_loss(d_z, torch.ones_like(d_z))
-                    ez_loss.to(self.device)
-                    losses['ez'].append(ez_loss.item())
+                        # DiscriminatorImg Loss
+                        d_i_input = self.Dimg(images, labels, self.device)
+                        d_i_output = self.Dimg(generated, labels, self.device)
 
-                    # DiscriminatorImg Loss
-                    d_i_input = self.Dimg(images, labels, self.device)
-                    d_i_output = self.Dimg(generated, labels, self.device)
+                        di_input_loss = bce_with_logits_loss(d_i_input, torch.ones_like(d_i_input))
+                        di_output_loss = bce_with_logits_loss(d_i_output, torch.zeros_like(d_i_output))
+                        di_loss_tot = (di_input_loss + di_output_loss)
+                        losses['di'].append(di_loss_tot.item())
 
-                    di_input_loss = bce_with_logits_loss(d_i_input, torch.ones_like(d_i_input))
-                    di_output_loss = bce_with_logits_loss(d_i_output, torch.zeros_like(d_i_output))
-                    di_loss_tot = (di_input_loss + di_output_loss)
-                    losses['di'].append(di_loss_tot.item())
+                        # Generator\DiscriminatorImg Loss
+                        dg_loss = 0.0001 * bce_with_logits_loss(d_i_output, torch.ones_like(d_i_output))
+                        losses['dg'].append(dg_loss.item())
 
-                    # Generator\DiscriminatorImg Loss
-                    dg_loss = 0.0001 * bce_with_logits_loss(d_i_output, torch.ones_like(d_i_output))
-                    losses['dg'].append(dg_loss.item())
-
-                    # this loss is only for debugging
-                    uni_diff_loss = (uni_loss(z.cpu().detach()) - uni_loss(z_prior.cpu().detach())) / batch_size
-                    # losses['uni_diff'].append(uni_diff_loss)
+                        # this loss is only for debugging
+                        uni_diff_loss = (uni_loss(z.cpu().detach()) - uni_loss(z_prior.cpu().detach())) / batch_size
+                        # losses['uni_diff'].append(uni_diff_loss)
 
 
-                    # Start back propagation
+                        # Start back propagation
 
-                    # Back prop on Encoder\Generator
-                    self.eg_optimizer.zero_grad()
-                    loss = eg_loss + reg_loss + ez_loss + dg_loss
-                    loss.backward(retain_graph=True)
-                    self.eg_optimizer.step()
+                        # Back prop on Encoder\Generator
+                        self.eg_optimizer.zero_grad()
+                        loss = eg_loss + reg_loss + ez_loss + dg_loss
+                        loss.backward(retain_graph=True)
+                        self.eg_optimizer.step()
 
-                    # Back prop on DiscriminatorZ
-                    self.dz_optimizer.zero_grad()
-                    dz_loss_tot.backward(retain_graph=True)
-                    self.dz_optimizer.step()
+                        # Back prop on DiscriminatorZ
+                        self.dz_optimizer.zero_grad()
+                        dz_loss_tot.backward(retain_graph=True)
+                        self.dz_optimizer.step()
 
-                    # Back prop on DiscriminatorImg
-                    self.di_optimizer.zero_grad()
-                    di_loss_tot.backward()
-                    self.di_optimizer.step()
+                        # Back prop on DiscriminatorImg
+                        self.di_optimizer.zero_grad()
+                        di_loss_tot.backward()
+                        self.di_optimizer.step()
 
-                    now = datetime.datetime.now()
+                        now = datetime.datetime.now()
+                        # record loss
+                        sample_num = images.size(0)
+                        _tqdm.set_postfix(OrderedDict(stage="train", epoch=epoch, loss=loss), sample_num=sample_num)
 
                 logging.info('[{h}:{m}[Epoch {e}] Loss: {t}'.format(h=now.hour, m=now.minute, e=epoch, t=loss.item()))
                 print_timestamp(f"[Epoch {epoch:d}] Loss: {loss.item():f}")
@@ -478,7 +489,8 @@ class Net(object):
 
                     for ii, (images, labels) in enumerate(valid_loader, 1):
                         images = images.to(self.device)
-                        labels = torch.stack([str_to_tensor(idx_to_class[l], normalize=True) for l in list(labels.numpy())])
+                        labels = torch.stack(
+                            [str_to_tensor(idx_to_class[l], normalize=True) for l in list(labels.numpy())])
                         labels = labels.to(self.device)
                         validate_labels = labels.to(self.device)
 
@@ -496,11 +508,11 @@ class Net(object):
                         losses['valid'].append(loss.item())
                         break
 
-
                 loss_tracker.append_many(**{k: mean(v) for k, v in losses.items()})
                 loss_tracker.plot()
 
-                logging.info('[{h}:{m}[Epoch {e}] Loss: {l}'.format(h=now.hour, m=now.minute, e=epoch, l=repr(loss_tracker)))
+                logging.info(
+                    '[{h}:{m}[Epoch {e}] Loss: {l}'.format(h=now.hour, m=now.minute, e=epoch, l=repr(loss_tracker)))
 
             except KeyboardInterrupt:
                 print_timestamp("{br}CTRL+C detected, saving model{br}".format(br=os.linesep))
@@ -515,6 +527,14 @@ class Net(object):
         if models_saving == 'last':
             cp_path = self.save(where_to_save_epoch, to_save_models=True)
         loss_tracker.plot()
+
+        # 代码训练完毕
+        print("结束训练时间: ")
+        end_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+        print(end_time)
+        print("训练耗时: " + smtp.date_gap(start_time, end_time))
+        smtp.main(dict_={"epochs: ": epochs,
+                         "训练耗时: ": smtp.date_gap(start_time, end_time)})
 
     def _mass_fn(self, fn_name, *args, **kwargs):
         """Apply a function to all possible Net's components.

@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 from torchvision.utils import save_image
 
 import consts
+import cv2
 
 
 def save_image_normalized(*args, **kwargs):
@@ -292,3 +293,11 @@ def merge_images(batch1, batch2):
         merged[2 * i] = image1
         merged[2 * i + 1] = image2
     return merged
+
+def cv_resize(filename):
+    img = cv2.imread(filename)
+    img1 = cv2.resize(img, (128, 128))
+    cv2.imwrite(filename, img1)
+
+if __name__ == '__main__':
+    cv_resize("/media/zouy/workspace/gitcloneroot/AgeProgression/input_test/25_0_me.jpg")
