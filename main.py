@@ -119,7 +119,7 @@ if __name__ == '__main__':
 
         net.teach(
             utkface_path=data_src,
-            batch_size=args.batch_size,
+            batch_size=consts.BATCH_SIZE,
             betas=betas,
             epochs=args.epochs,
             weight_decay=weight_decay,

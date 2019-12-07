@@ -14,7 +14,7 @@ output=${basepath}/output_dir
 output_test=${basepath}/output_dir_test
 input_test=${basepath}/input_test/25_0_me.jpg #32_0_0_20170117121829950.jpg.chip.jpg
 load_dat=${basepath}/output_dir/epoch50
-epochs=200
+epochs=100
 
 if [ $# -ne 1 ] #有且仅有一个参数，否则退出
 then

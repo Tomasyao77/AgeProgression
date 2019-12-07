@@ -361,17 +361,18 @@ class Net(object):
         where_to_save = where_to_save or default_where_to_save()
         dataset = get_utkface_dataset(utkface_path)
         valid_size = valid_size or batch_size
-        valid_dataset, train_dataset = torch.utils.data.random_split(dataset, (valid_size, len(dataset) - valid_size))
+        train_dataset, valid_dataset = torch.utils.data.random_split(dataset, (len(dataset) - valid_size, valid_size))
 
         train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
         valid_loader = DataLoader(dataset=valid_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
         idx_to_class = {v: k for k, v in dataset.class_to_idx.items()}
 
         input_output_loss = l1_loss
-        nrow = round((2 * batch_size) ** 0.5)
+        nrow = round((2 * batch_size) ** 0.5)  # 我知道了 原图与生成图合并图的矩阵维度
 
         # save_image_normalized(tensor=validate_images, filename=where_to_save+"/base.png")
 
+        # 超参数赋值 有点6
         for optimizer in (self.eg_optimizer, self.dz_optimizer, self.di_optimizer):
             for param in ('weight_decay', 'betas', 'lr'):
                 val = locals()[param]
@@ -404,10 +405,10 @@ class Net(object):
                         # Input\Output Loss
                         z_l = torch.cat((z, labels), 1)
                         generated = self.G(z_l)
-                        eg_loss = input_output_loss(generated, images)
+                        eg_loss = input_output_loss(generated, images)  # 顺序是不是反了 --鄙人疑虑?
                         losses['eg'].append(eg_loss.item())
 
-                        # Total Variance Regularization Loss
+                        # Total Variance Regularization Loss !!!???
                         reg = l1_loss(generated[:, :, :, :-1], generated[:, :, :, 1:]) + l1_loss(
                             generated[:, :, :-1, :],
                             generated[:, :, 1:, :])
@@ -421,7 +422,9 @@ class Net(object):
                         losses['reg'].append(reg_loss.item())
 
                         # DiscriminatorZ Loss
-                        z_prior = two_sided(torch.rand_like(z, device=self.device))  # [-1 : 1]
+                        # 这个损失不好理解
+                        # torch.rand_like返回跟input的tensor一样size的0-1随机数
+                        z_prior = two_sided(torch.rand_like(z, device=self.device))  # [-1 : 1]?
                         d_z_prior = self.Dz(z_prior)
                         d_z = self.Dz(z)
                         dz_loss_prior = bce_with_logits_loss(d_z_prior, torch.ones_like(d_z_prior))
@@ -473,7 +476,8 @@ class Net(object):
                         now = datetime.datetime.now()
                         # record loss
                         sample_num = images.size(0)
-                        _tqdm.set_postfix(OrderedDict(stage="train", epoch=epoch, loss=loss), sample_num=sample_num)
+                        _tqdm.set_postfix(OrderedDict(stage="train", epoch=epoch, loss=loss.item()),
+                                          sample_num=sample_num)
 
                 logging.info('[{h}:{m}[Epoch {e}] Loss: {t}'.format(h=now.hour, m=now.minute, e=epoch, t=loss.item()))
                 print_timestamp(f"[Epoch {epoch:d}] Loss: {loss.item():f}")
@@ -487,26 +491,32 @@ class Net(object):
                 with torch.no_grad():  # validation
                     self.eval()  # move to eval mode
 
-                    for ii, (images, labels) in enumerate(valid_loader, 1):
-                        images = images.to(self.device)
-                        labels = torch.stack(
-                            [str_to_tensor(idx_to_class[l], normalize=True) for l in list(labels.numpy())])
-                        labels = labels.to(self.device)
-                        validate_labels = labels.to(self.device)
+                    with tqdm(valid_loader) as _tqdm_val:
+                        for ii, (images, labels) in enumerate(_tqdm_val, 1):
+                            # for ii, (images, labels) in enumerate(valid_loader, 1):
+                            images = images.to(self.device)
+                            labels = torch.stack(
+                                [str_to_tensor(idx_to_class[l], normalize=True) for l in list(labels.numpy())])
+                            labels = labels.to(self.device)
+                            validate_labels = labels.to(self.device)
 
-                        z = self.E(images)
-                        z_l = torch.cat((z, validate_labels), 1)
-                        generated = self.G(z_l)
+                            z = self.E(images)
+                            z_l = torch.cat((z, validate_labels), 1)
+                            generated = self.G(z_l)
 
-                        loss = input_output_loss(images, generated)
+                            loss = input_output_loss(images, generated)
 
-                        joined = merge_images(images, generated)  # torch.cat((generated, images), 0)
+                            joined = merge_images(images, generated)  # torch.cat((generated, images), 0)
 
-                        file_name = os.path.join(where_to_save_epoch, 'validation.png')
-                        save_image_normalized(tensor=joined, filename=file_name, nrow=nrow)
+                            file_name = os.path.join(where_to_save_epoch, 'validation.png')
+                            save_image_normalized(tensor=joined, filename=file_name, nrow=nrow)
 
-                        losses['valid'].append(loss.item())
-                        break
+                            losses['valid'].append(loss.item())
+                            # record loss
+                            sample_num = images.size(0)
+                            _tqdm_val.set_postfix(OrderedDict(stage="validate", epoch=epoch, loss=loss.item()),
+                                                  sample_num=sample_num)
+                            break
 
                 loss_tracker.append_many(**{k: mean(v) for k, v in losses.items()})
                 loss_tracker.plot()
