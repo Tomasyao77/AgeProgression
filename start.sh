@@ -12,9 +12,9 @@ logs_test=${basepath}/logs/${DATE}_UTKFace_test_log
 #test
 output=${basepath}/output_dir
 output_test=${basepath}/output_dir_test
-input_test=${basepath}/input_test/25_0_me.jpg #32_0_0_20170117121829950.jpg.chip.jpg
-load_dat=${basepath}/output_dir/epoch50
-epochs=100
+input_test=${basepath}/input_test
+load_dat=${basepath}/output_dir/epoch200
+epochs=200
 
 if [ $# -ne 1 ] #有且仅有一个参数，否则退出
 then
@@ -30,7 +30,7 @@ then
 	echo "train..."
 	source activate torchg
 	cd ${basepath}
-	setsid python ./main.py --ms=tail --mode=train -e=${epochs} --output=${output} > ${logs} 2>&1 &
+	setsid python ./main.py --ms=always --mode=train -e=${epochs} --output=${output} > ${logs} 2>&1 &
 #	python ./main.py --ms=tail --mode=train -e=${epochs} --output=${output}
 elif [ $1 = "test" ]
 then
@@ -38,7 +38,8 @@ then
 	source activate torchg
 	cd ${basepath}
 	#测试速度很快所以就不在后台运行了
-	python ./main.py --mode=test -a=25 -g=0 -w --load=${load_dat} --input=${input_test} --output=${output_test} > ${logs_test} 2>&1 &
+#	setsid python ./main.py --mode=test -a=25 -g=0 -w --load=${load_dat} --input=${input_test} --output=${output_test} > ${logs_test} 2>&1 &
+	python ./main.py --mode=test -a=5 -g=0 -w --load=${load_dat} --input=${input_test} --output=${output_test}
 elif [ $1 = "demo" ]
 then
 	echo "demo..."

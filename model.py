@@ -50,7 +50,7 @@ class Encoder(nn.Module):
         self.fc_layer = nn.Sequential(
             OrderedDict(
                 [
-                    ('e_fc_1', nn.Linear(in_features=1024, out_features=consts.NUM_Z_CHANNELS)),
+                    ('e_fc_1', nn.Linear(in_features=1024, out_features=consts.NUM_Z_CHANNELS)),  # 100
                     ('tanh_1', nn.Tanh())  # normalize to [-1, 1] range
                 ]
             )
@@ -60,10 +60,11 @@ class Encoder(nn.Module):
         out = face
         for conv_layer in self.conv_layers:
             # print("H")
+            # 用for循环可还行
             out = conv_layer(out)
             # print(out.shape)
             # print("W")
-        out = out.flatten(1, -1)
+        out = out.flatten(1, -1)  # flatten函数返回的是拷贝
         out = self.fc_layer(out)
         return out
 
@@ -85,7 +86,7 @@ class DiscriminatorZ(nn.Module):
             )
 
         self.layers.add_module(
-            'dz_fc_%d' % (i + 1),
+            'dz_fc_%d' % (i + 1),  # i是上面for循环的 这里也可以访问到!
             nn.Sequential(
                 nn.Linear(out_dim, 1),
                 # nn.Sigmoid()  # commented out because logits are needed
@@ -106,6 +107,8 @@ class DiscriminatorImg(nn.Module):
         out_dims = (16, 32, 64, 128)
         self.conv_layers = nn.ModuleList()
         self.fc_layers = nn.ModuleList()
+        # 3, 16 + 12, 32, 64
+        # 16, 32, 64, 128
         for i, (in_dim, out_dim) in enumerate(zip(in_dims, out_dims), 1):
             self.conv_layers.add_module(
                 'dimg_conv_%d' % i,
@@ -119,6 +122,7 @@ class DiscriminatorImg(nn.Module):
         self.fc_layers.add_module(
             'dimg_fc_1',
             nn.Sequential(
+                # 8192 1024
                 nn.Linear(128 * 8 * 8, 1024),
                 nn.LeakyReLU()
             )
@@ -163,9 +167,11 @@ class DiscriminatorImg(nn.Module):
 class Generator(nn.Module):
     def __init__(self):
         super(Generator, self).__init__()
+        # 反卷积层
         num_deconv_layers = 5
         mini_size = 4
         self.fc = nn.Sequential(
+            # 100+12 1024*16
             nn.Linear(
                 consts.NUM_Z_CHANNELS + consts.LABEL_LEN_EXPANDED,
                 consts.NUM_GEN_CHANNELS * mini_size ** 2
@@ -245,6 +251,7 @@ class Net(object):
 
         original_vectors = [None, None]
         for i in range(2):
+            # 这维度操作太6了
             z = self.E(image_tensors[i].unsqueeze(0))
             l = Label(ages[i], genders[i]).to_tensor(normalize=True).unsqueeze(0).to(device=z.device)
             z_l = torch.cat((z, l), 1)
@@ -288,7 +295,7 @@ class Net(object):
         print_timestamp("Saved test result to " + dest)
         return dest
 
-    def test_single(self, image_tensor, age, gender, target, watermark):
+    def test_single(self, image_tensor, age, gender, target, watermark, load=None, img_name=None):
 
         self.eval()
         batch = image_tensor.repeat(consts.NUM_AGES, 1, 1, 1).to(device=self.device)  # N x D x H x W
@@ -337,7 +344,7 @@ class Net(object):
                 joined[img_idx, :, elem_idx, :] = 1  # color border white
                 joined[img_idx, :, :, elem_idx] = 1  # color border white
 
-        dest = os.path.join(target, 'menifa.png')
+        dest = os.path.join(target, load[load.rindex("/") + 1:] + "_" + img_name + '.png')
         save_image_normalized(tensor=joined, filename=dest, nrow=joined.size(0))
         print_timestamp("Saved test result to " + dest)
         return dest

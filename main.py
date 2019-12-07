@@ -13,6 +13,7 @@ from utils import *
 from torchvision.datasets.folder import pil_loader
 import gc
 import torch
+from tqdm import tqdm
 
 gc.collect()
 
@@ -131,6 +132,11 @@ if __name__ == '__main__':
 
     elif args.mode == 'test':
 
+        assert os.path.isdir(args.input)
+        input_root = args.input
+        f = os.listdir(input_root)
+        assert f.__len__() >= 1
+
         if args.load is None:
             raise RuntimeError("Must provide path of trained models")
 
@@ -140,11 +146,14 @@ if __name__ == '__main__':
         if not os.path.isdir(results_dest):
             os.makedirs(results_dest)
 
-        image_tensor = pil_to_model_tensor_transform(pil_loader(args.input)).to(net.device)
-        net.test_single(
-            image_tensor=image_tensor,
-            age=args.age,
-            gender=args.gender,
-            target=results_dest,
-            watermark=args.watermark
-        )
+        for name in tqdm(f):
+            image_tensor = pil_to_model_tensor_transform(pil_loader(input_root + "/" + name)).to(net.device)
+            net.test_single(
+                image_tensor=image_tensor,
+                age=args.age,
+                gender=args.gender,
+                target=results_dest,
+                watermark=args.watermark,
+                load=args.load,
+                img_name=name
+            )
