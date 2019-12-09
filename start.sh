@@ -4,7 +4,7 @@ basepath="/media/d9lab/data11/tomasyao/workspace/pycharm_ws/AgeProgression"
 DATE=`date +%Y%m%d_%H%M%S`
 
 data_dir=${basepath}/data_dir/morph2
-tensorboard=${basepath}/tf_log/morph2
+tensorboard=${basepath}/tf_log/UTKFace
 checkpoint=${basepath}/checkpoint/morph2
 #log的目录必须存在 上面的目录不存在会自动创建
 logs=${basepath}/logs/${DATE}_UTKFace_train_log
@@ -30,7 +30,7 @@ then
 	echo "train..."
 	source activate torchg
 	cd ${basepath}
-	setsid python ./main.py --ms=always --mode=train -e=${epochs} --output=${output} > ${logs} 2>&1 &
+	setsid python ./main.py --ms=never --mode=train -e=${epochs} --output=${output} > ${logs} 2>&1 &
 #	python ./main.py --ms=tail --mode=train -e=${epochs} --output=${output}
 elif [ $1 = "test" ]
 then

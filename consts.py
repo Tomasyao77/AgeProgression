@@ -21,8 +21,10 @@ LABEL_LEN_EXPANDED = NUM_AGES + NUM_GENDERS_EXPANDED
 MALE = 0
 FEMALE = 1
 
-UTKFACE_DEFAULT_PATH = './data/UTKFace'
-UTKFACE_ORIGINAL_IMAGE_FORMAT = re.compile('^(\d+)_(\d+)_\d+_(\d+)\.jpg\.chip\.jpg$')
+UTKFACE_DEFAULT_PATH = "./data/UTKFace"
+UTKFACE_ORIGINAL_IMAGE_FORMAT = re.compile("^(\d+)_(\d+)_\d+_(\d+)\.jpg\.chip\.jpg$")
 
-TRAINED_MODEL_EXT = '.dat'
+TRAINED_MODEL_EXT = ".dat"
 TRAINED_MODEL_FORMAT = "{}" + TRAINED_MODEL_EXT
+
+TF_LOG = "./tf_log/UTKFace"

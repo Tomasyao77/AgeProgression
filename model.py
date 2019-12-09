@@ -10,10 +10,12 @@ from PIL import Image
 
 import torch
 import torch.nn as nn
+import torch.backends.cudnn as cudnn
 from torch.nn.functional import l1_loss, mse_loss
 from torch.nn.functional import binary_cross_entropy_with_logits as bce_with_logits_loss
 from torch.optim import Adam
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 import smtp
 import time
 from tqdm import tqdm
@@ -391,6 +393,19 @@ class Net(object):
         save_count = 0
         paths_for_gif = []
 
+        # 模型加速
+        device_ = "cuda" if torch.cuda.is_available() else "cpu"
+        if device_ == "cuda":
+            cudnn.benchmark = True
+        # tensorboard记录
+        train_eg_writer = SummaryWriter(log_dir=consts.TF_LOG + "/" + "_train_eg")
+        train_reg_writer = SummaryWriter(log_dir=consts.TF_LOG + "/" + "_train_reg")
+        train_dz_writer = SummaryWriter(log_dir=consts.TF_LOG + "/" + "_train_dz")
+        train_ez_writer = SummaryWriter(log_dir=consts.TF_LOG + "/" + "_train_ez")
+        train_di_writer = SummaryWriter(log_dir=consts.TF_LOG + "/" + "_train_di")
+        train_dg_writer = SummaryWriter(log_dir=consts.TF_LOG + "/" + "_train_dg")
+        val_writer = SummaryWriter(log_dir=consts.TF_LOG + "/" + "_val")
+
         for epoch in range(1, epochs + 1):
             where_to_save_epoch = os.path.join(where_to_save, "epoch" + str(epoch))
             try:
@@ -424,7 +439,7 @@ class Net(object):
                         #        torch.sum(torch.abs(generated[:, :, :, :-1] - generated[:, :, :, 1:])) +
                         #        torch.sum(torch.abs(generated[:, :, :-1, :] - generated[:, :, 1:, :]))
                         # ) / float(generated.size(0))
-                        reg_loss = 0 * reg
+                        reg_loss = 0 * reg  # 乘以0干嘛?
                         reg_loss.to(self.device)
                         losses['reg'].append(reg_loss.item())
 
@@ -486,6 +501,14 @@ class Net(object):
                         _tqdm.set_postfix(OrderedDict(stage="train", epoch=epoch, loss=loss.item()),
                                           sample_num=sample_num)
 
+                # 记录train tensorboard
+                train_eg_writer.add_scalar("loss", np.array(losses["eg"]).mean(), epoch)
+                train_reg_writer.add_scalar("loss", np.array(losses["reg"]).mean(), epoch)
+                train_dz_writer.add_scalar("loss", np.array(losses["dz"]).mean(), epoch)
+                train_ez_writer.add_scalar("loss", np.array(losses["ez"]).mean(), epoch)
+                train_di_writer.add_scalar("loss", np.array(losses["di"]).mean(), epoch)
+                train_dg_writer.add_scalar("loss", np.array(losses["dg"]).mean(), epoch)
+
                 logging.info('[{h}:{m}[Epoch {e}] Loss: {t}'.format(h=now.hour, m=now.minute, e=epoch, t=loss.item()))
                 print_timestamp(f"[Epoch {epoch:d}] Loss: {loss.item():f}")
                 to_save_models = models_saving in ('always', 'tail')
@@ -523,7 +546,9 @@ class Net(object):
                             sample_num = images.size(0)
                             _tqdm_val.set_postfix(OrderedDict(stage="validate", epoch=epoch, loss=loss.item()),
                                                   sample_num=sample_num)
-                            break
+                            # break #感觉不需要break batchsize和valsize大小一样的
+                            #记录val tensorboard
+                            val_writer.add_scalar("loss", np.array(losses["valid"]).mean(), epoch)
 
                 loss_tracker.append_many(**{k: mean(v) for k, v in losses.items()})
                 loss_tracker.plot()

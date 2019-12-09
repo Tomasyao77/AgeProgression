@@ -17,9 +17,9 @@ from tqdm import tqdm
 
 gc.collect()
 
-assert sys.version_info >= (3, 6),\
+assert sys.version_info >= (3, 6), \
     "This script requires Python >= 3.6"  # TODO 3.7?
-assert tuple(int(ver_num) for ver_num in torch.__version__.split('.')) >= (0, 4, 0),\
+assert tuple(int(ver_num) for ver_num in torch.__version__.split('.')) >= (0, 4, 0), \
     "This script requires PyTorch >= 0.4.0"  # TODO 0.4.1?
 
 
@@ -44,7 +44,8 @@ def str_to_bool(s):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='AgeProgression on PyTorch.', formatter_class=argparse.RawTextHelpFormatter)
+    parser = argparse.ArgumentParser(description='AgeProgression on PyTorch.',
+                                     formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('--mode', choices=['train', 'test'], default='train')
 
     # train params
@@ -81,13 +82,17 @@ if __name__ == '__main__':
 
     # shared params
     parser.add_argument('--cpu', '-c', action='store_true', help='Run on CPU even if CUDA is available.')
-    parser.add_argument('--load', '-l', required=False, default=None, help='Trained models path for pre-training or for testing')
-    parser.add_argument('--input', '-i', default=None, help='Training dataset path (default is {}) or testing image path'.format(default_train_results_dir()))
+    parser.add_argument('--load', '-l', required=False, default=None,
+                        help='Trained models path for pre-training or for testing')
+    parser.add_argument('--input', '-i', default=None,
+                        help='Training dataset path (default is {}) or testing image path'.format(
+                            default_train_results_dir()))
     parser.add_argument('--output', '-o', default='')
     parser.add_argument('-z', dest='z_channels', default=50, type=int, help='Length of Z vector')
     args = parser.parse_args()
 
     consts.NUM_Z_CHANNELS = args.z_channels
+    # 网络
     net = model.Net()
 
     if not args.cpu and torch.cuda.is_available():
@@ -116,7 +121,6 @@ if __name__ == '__main__':
         if os.path.exists(log_path):
             os.remove(log_path)
         logging.basicConfig(filename=log_path, level=logging.DEBUG)
-
 
         net.teach(
             utkface_path=data_src,
