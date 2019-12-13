@@ -151,11 +151,13 @@ if __name__ == '__main__':
             os.makedirs(results_dest)
 
         for name in tqdm(f):
+            age = int(name.split("_")[0])
+            gender = int(name.split("_")[1])
             image_tensor = pil_to_model_tensor_transform(pil_loader(input_root + "/" + name)).to(net.device)
             net.test_single(
                 image_tensor=image_tensor,
-                age=args.age,
-                gender=args.gender,
+                age=age,
+                gender=gender,
                 target=results_dest,
                 watermark=args.watermark,
                 load=args.load,

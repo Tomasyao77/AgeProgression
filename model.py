@@ -300,6 +300,7 @@ class Net(object):
     def test_single(self, image_tensor, age, gender, target, watermark, load=None, img_name=None):
 
         self.eval()
+        # ? (10,1,1,1)
         batch = image_tensor.repeat(consts.NUM_AGES, 1, 1, 1).to(device=self.device)  # N x D x H x W
         z = self.E(batch)  # N x Z
 
@@ -547,7 +548,7 @@ class Net(object):
                             _tqdm_val.set_postfix(OrderedDict(stage="validate", epoch=epoch, loss=loss.item()),
                                                   sample_num=sample_num)
                             # break #感觉不需要break batchsize和valsize大小一样的
-                            #记录val tensorboard
+                            # 记录val tensorboard
                             val_writer.add_scalar("loss", np.array(losses["valid"]).mean(), epoch)
 
                 loss_tracker.append_many(**{k: mean(v) for k, v in losses.items()})
