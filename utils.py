@@ -244,7 +244,7 @@ def mean(l):
 def uni_loss(input):
     assert len(input.shape) == 2
     batch_size, input_size = input.size()
-    hist = torch.histc(input=input, bins=input_size, min=-1, max=1)
+    hist = torch.histc(input=input, bins=input_size, min=-1, max=1)  # 计算输入张量的直方图
     return mse(hist, batch_size * torch.ones_like(hist)) / input_size
 
 
@@ -318,4 +318,21 @@ def cv_resize(filename):
 
 
 if __name__ == '__main__':
-    cv_resize("/media/zouy/workspace/gitcloneroot/AgeProgression/input_test/25_0_me.jpg")
+    # cv_resize("/media/zouy/workspace/gitcloneroot/AgeProgression/input_test/25_0_me.jpg")
+
+    # 调试labels的维度
+    # data_src = consts.UTKFACE_DEFAULT_PATH
+    # dataset = get_utkface_dataset(data_src)
+    # valid_size = 64
+    # train_dataset, valid_dataset = torch.utils.data.random_split(dataset, (len(dataset) - valid_size, valid_size))
+    # train_loader = DataLoader(dataset=train_dataset, batch_size=64, shuffle=True, drop_last=True)
+    # valid_loader = DataLoader(dataset=valid_dataset, batch_size=64, shuffle=False, drop_last=True)
+    # # print(dataset.class_to_idx.items())
+    # idx_to_class = {v: k for k, v in dataset.class_to_idx.items()}
+    #
+    # for i, (images, labels) in enumerate(train_loader, 1):
+    #     labels = torch.stack([str_to_tensor(idx_to_class[l], normalize=True) for l in
+    #                           list(labels.numpy())])
+    #     print(labels.shape)
+    #     break
+    print(1)

@@ -52,7 +52,7 @@ class Encoder(nn.Module):
         self.fc_layer = nn.Sequential(
             OrderedDict(
                 [
-                    ('e_fc_1', nn.Linear(in_features=1024, out_features=consts.NUM_Z_CHANNELS)),  # 100
+                    ('e_fc_1', nn.Linear(in_features=1024, out_features=consts.NUM_Z_CHANNELS)),  # 100 50
                     ('tanh_1', nn.Tanh())  # normalize to [-1, 1] range
                 ]
             )
@@ -60,23 +60,29 @@ class Encoder(nn.Module):
 
     def forward(self, face):
         out = face
+        # print(out.shape)
         for conv_layer in self.conv_layers:
             # print("H")
             # 用for循环可还行
             out = conv_layer(out)
             # print(out.shape)
             # print("W")
-        out = out.flatten(1, -1)  # flatten函数返回的是拷贝
+        # print(out.shape)
+        out = out.flatten(1, -1)  # flatten函数返回的是拷贝 卷积层展平后连接全连接层
+        # print(out.shape)
         out = self.fc_layer(out)
         return out
 
 
-class DiscriminatorZ(nn.Module):
+class DiscriminatorZ(nn.Module):  # 就是4个全连接层
     def __init__(self):
         super(DiscriminatorZ, self).__init__()
+        # (100, 64, 32, 16)
         dims = (consts.NUM_Z_CHANNELS, consts.NUM_ENCODER_CHANNELS, consts.NUM_ENCODER_CHANNELS // 2,
                 consts.NUM_ENCODER_CHANNELS // 4)
         self.layers = nn.ModuleList()
+        # in_dim: 100, 64, 32
+        # out_dim: 64, 32, 16
         for i, (in_dim, out_dim) in enumerate(zip(dims[:-1], dims[1:]), 1):
             self.layers.add_module(
                 'dz_fc_%d' % i,
@@ -97,8 +103,10 @@ class DiscriminatorZ(nn.Module):
 
     def forward(self, z):
         out = z
+        # print(out.shape)
         for layer in self.layers:
             out = layer(out)
+            # print(out.shape)
         return out
 
 
@@ -109,7 +117,7 @@ class DiscriminatorImg(nn.Module):
         out_dims = (16, 32, 64, 128)
         self.conv_layers = nn.ModuleList()
         self.fc_layers = nn.ModuleList()
-        # 3, 16 + 12, 32, 64
+        # 3, 36, 32, 64
         # 16, 32, 64, 128
         for i, (in_dim, out_dim) in enumerate(zip(in_dims, out_dims), 1):
             self.conv_layers.add_module(
@@ -138,30 +146,32 @@ class DiscriminatorImg(nn.Module):
             )
         )
 
-    def forward(self, imgs, labels, device):
+    def forward(self, imgs, labels, device): #labels: [batch_size, 20]
         out = imgs
-
+        # print("输入", out.shape)
         # run convs
         for i, conv_layer in enumerate(self.conv_layers, 1):
             # print(out.shape)
             # print(conv_layer)
             out = conv_layer(out)
+            # print(out.shape)
             if i == 1:
                 # concat labels after first conv
+                # 这一段很重要 很难
                 labels_tensor = torch.zeros(torch.Size((out.size(0), labels.size(1), out.size(2), out.size(3))),
                                             device=device)
                 for img_idx in range(out.size(0)):
                     for label in range(labels.size(1)):
                         labels_tensor[img_idx, label, :, :] = labels[img_idx, label]  # fill a square
                 out = torch.cat((out, labels_tensor), 1)
+                # print("连接标签后", out.shape)
 
         # run fcs
         out = out.flatten(1, -1)
+        # print("flatten后",out.shape)
         for fc_layer in self.fc_layers:
-            # print(out.shape)
-            # print(fc_layer)
-
             out = fc_layer(out)
+            # print(out.shape)
 
         return out
 
@@ -173,7 +183,7 @@ class Generator(nn.Module):
         num_deconv_layers = 5
         mini_size = 4
         self.fc = nn.Sequential(
-            # 100+12 1024*16
+            # 100+20 1024*16
             nn.Linear(
                 consts.NUM_Z_CHANNELS + consts.LABEL_LEN_EXPANDED,
                 consts.NUM_GEN_CHANNELS * mini_size ** 2
@@ -216,11 +226,11 @@ class Generator(nn.Module):
                 if (isinstance(age, int) and isinstance(gender, int)) \
                 else torch.cat((age, gender), 1)
             out = torch.cat((out, label), 1)  # z_l
-        # print(out.shape)
+        # print(out.shape)  # [batch_size, 120]
         out = self.fc(out)
-        # print(out.shape)
+        # print(out.shape) # [batch_size, 16384]
         out = self._decompress(out)
-        # print(out.shape)
+        # print(out.shape) # [batch_size, 1024, 4, 4] 全连接层变成卷积层
         for i, deconv_layer in enumerate(self.deconv_layers, 1):
             out = deconv_layer(out)
             # print(out.shape)
@@ -698,3 +708,31 @@ def create_gif(img_paths, dst, start, step):
         frames.append(image)
         start += step
     imageio.mimsave(dst, frames, 'GIF', duration=0.5)
+
+
+if __name__ == '__main__':
+    # encoder
+    # encoder = Encoder()
+    # print(encoder)
+    # image_tensors = torch.ones(64, 3, 128, 128)  # N x D x H x W
+    # z = encoder(image_tensors)
+
+    # generator
+    # generator = Generator()
+    # print(generator)
+    # z_tensors = torch.ones(64, 120)  # N x Z
+    # g = generator(z_tensors)
+
+    # discriminatorZ
+    # discriminatorZ = DiscriminatorZ()
+    # print(discriminatorZ)
+    # z_tensors = torch.ones(64, 100)  # N x Z
+    # dz = discriminatorZ(z_tensors)
+
+    # discriminatorImg
+    discriminatorImg = DiscriminatorImg()
+    # print(discriminatorImg)
+    image_tensors = torch.ones(64, 3, 128, 128)  # N x D x H x W
+    labels = torch.ones(64, 20)
+    di = discriminatorImg(image_tensors, labels, "cpu")
+    # print(di.shape)
