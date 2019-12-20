@@ -23,6 +23,7 @@ def save_image_normalized(*args, **kwargs):
 def two_sided(x):
     return 2 * (x - 0.5)
 
+
 def one_sided(x):
     return (x + 1) / 2
 
@@ -38,6 +39,7 @@ pil_to_model_tensor_transform = transforms.Compose(
 
 def get_utkface_dataset(root):
     print(root)
+    # 有标签的 0.0表示第0个年龄段 男性
     ret = lambda: ImageFolder(os.path.join(root, 'labeled'), transform=pil_to_model_tensor_transform)
     try:
         return ret()
@@ -45,6 +47,8 @@ def get_utkface_dataset(root):
         sort_to_classes(os.path.join(root, 'unlabeled'), print_cycle=1000)
         return ret()
 
+
+# 对未打标签的图片进行打标签分类
 def sort_to_classes(root, print_cycle=np.inf):
     # Example UTKFace cropped and aligned image file format: [age]_[gender]_[race]_[date&time].jpg.chip.jpg
     # Should be 23613 images, use print_cycle >= 1000
@@ -54,9 +58,10 @@ def sort_to_classes(root, print_cycle=np.inf):
         print('[UTKFace dset labeler] ' + text)
 
     log('Starting labeling process...')
+    # 善用这些骚操作可以简化很多代码 一行即可
     files = [f for f in os.listdir(root) if os.path.isfile(os.path.join(root, f))]
     if not files:
-        raise FileNotFoundError('No image files in '+root)
+        raise FileNotFoundError('No image files in ' + root)
     copied_count = 0
     sorted_folder = os.path.join(root, '..', 'labeled')
     if not os.path.isdir(sorted_folder):
@@ -64,14 +69,19 @@ def sort_to_classes(root, print_cycle=np.inf):
 
     for f in files:
         matcher = consts.UTKFACE_ORIGINAL_IMAGE_FORMAT.match(f)
+        # [age]_[gender]_[race]_[date&time].jpg.chip.jpg
+        # 如果不是以上格式命名的文件则跳过后续步骤
         if matcher is None:
             continue
+        # re.compile("^(\d+)_(\d+)_\d+_(\d+)\.jpg\.chip\.jpg$")
+        # group是针对()来说的
         age, gender, dtime = matcher.groups()
         srcfile = os.path.join(root, f)
+        # 变成0.0这种
         label = Label(int(age), int(gender))
         dstfolder = os.path.join(sorted_folder, label.to_str())
-        dstfile = os.path.join(dstfolder, dtime+'.jpg')
-        if os.path.isfile(dstfile):
+        dstfile = os.path.join(dstfolder, dtime + '.jpg')
+        if os.path.isfile(dstfile):  # 如果已经有这张图片了则跳过
             continue
         if not os.path.isdir(dstfolder):
             os.mkdir(dstfolder)
@@ -111,25 +121,29 @@ class Label(namedtuple('Label', ('age', 'gender'))):
         age -= 1
         if age < 20:
             # first 4 age groups are for kids <= 20, 5 years intervals
+            # 0-4 5-9 10-14 15-19
             return max(age // 5, 0)
         else:
             # last (6?) age groups are for adults > 20, 10 years intervals
+            # 20-29 30-39 40-49 50-59 60-69 70-79
             return min(4 + (age - 20) // 10, consts.NUM_AGES - 1)
 
     def to_tensor(self, normalize=False):
         return str_to_tensor(self.to_str(), normalize=normalize)
 
 
-
 fmt_t = "%H_%M"
 fmt = "%Y_%m_%d"
 
+
 def default_train_results_dir():
-    return os.path.join('.', 'trained_models', datetime.datetime.now().strftime(fmt), datetime.datetime.now().strftime(fmt_t))
+    return os.path.join('.', 'trained_models', datetime.datetime.now().strftime(fmt),
+                        datetime.datetime.now().strftime(fmt_t))
 
 
 def default_where_to_save(eval=True):
-    path_str = os.path.join('.', 'results', datetime.datetime.now().strftime(fmt), datetime.datetime.now().strftime(fmt_t))
+    path_str = os.path.join('.', 'results', datetime.datetime.now().strftime(fmt),
+                            datetime.datetime.now().strftime(fmt_t))
     if not os.path.exists(path_str):
         os.makedirs(path_str)
 
@@ -143,6 +157,7 @@ def print_timestamp(s):
 
 
 class LossTracker(object):
+    # Python中使用了某些启发式算法(heuristics)来加速垃圾回收
     def __init__(self, use_heuristics=False, plot=False, eps=1e-3):
         # assert 'train' in names and 'valid' in names, str(names)
         self.losses = defaultdict(lambda: [])
@@ -150,7 +165,7 @@ class LossTracker(object):
         self.epochs = 0
         self.use_heuristics = use_heuristics
         if plot:
-           # print("names[-1] - "+names[-1])
+            # print("names[-1] - "+names[-1])
             plt.ion()
             plt.show()
         else:
@@ -167,6 +182,7 @@ class LossTracker(object):
         if self.use_heuristics and self.epochs >= 2:
             delta_train = self.train_losses[-1] - self.train_losses[-2]
             delta_valid = self.valid_losses[-1] - self.valid_losses[-2]
+            # 6啊还有这种操作
             if delta_train < -self.eps and delta_valid < -self.eps:
                 pass  # good fit, continue training
             elif delta_train < -self.eps and delta_valid > +self.eps:
@@ -294,10 +310,12 @@ def merge_images(batch1, batch2):
         merged[2 * i + 1] = image2
     return merged
 
+
 def cv_resize(filename):
     img = cv2.imread(filename)
     img1 = cv2.resize(img, (128, 128))
     cv2.imwrite(filename, img1)
+
 
 if __name__ == '__main__':
     cv_resize("/media/zouy/workspace/gitcloneroot/AgeProgression/input_test/25_0_me.jpg")
