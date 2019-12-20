@@ -25,19 +25,19 @@ assert tuple(int(ver_num) for ver_num in torch.__version__.split('.')) >= (0, 4,
 
 def str_to_gender(s):
     s = str(s).lower()
-    if s in ('m', 'man', '0'):
+    if s in ('m', 'man', 'male' '0'):
         return 0
-    elif s in ('f', 'female', '1'):
+    elif s in ('f', 'female', 'w', 'woman', '1'):
         return 1
     else:
         raise KeyError("No gender found")
 
 
 def str_to_bool(s):
-    s = s.lower()
+    s = str(s).lower()
     if s in ('true', 't', 'yes', 'y', '1'):
         return True
-    elif s in ('false', 'f', 'no', 'n', 'o'):
+    elif s in ('false', 'f', 'no', 'n', 'o', '0'):  # o是不是敲错了
         return False
     else:
         raise KeyError("Invalid boolean")
@@ -78,7 +78,7 @@ if __name__ == '__main__':
     # test params
     parser.add_argument('--age', '-a', required=False, type=int)
     parser.add_argument('--gender', '-g', required=False, type=str_to_gender)
-    parser.add_argument('--watermark', '-w', action='store_true')
+    parser.add_argument('--watermark', '-w', action='store_true')  # 只要运行时该变量有传参就将该变量设为True -w 即可起开关作用
 
     # shared params
     parser.add_argument('--cpu', '-c', action='store_true', help='Run on CPU even if CUDA is available.')
@@ -86,7 +86,7 @@ if __name__ == '__main__':
                         help='Trained models path for pre-training or for testing')
     parser.add_argument('--input', '-i', default=None,
                         help='Training dataset path (default is {}) or testing image path'.format(
-                            default_train_results_dir()))
+                            default_train_results_dir()))  # ?不对吧
     parser.add_argument('--output', '-o', default='')
     parser.add_argument('-z', dest='z_channels', default=50, type=int, help='Length of Z vector')
     args = parser.parse_args()
@@ -99,7 +99,7 @@ if __name__ == '__main__':
         net.cuda()
 
     if args.mode == 'train':
-
+        # args.load表示加载预训练模型，这样的话就不用设置betas weight_decay lr等训练时的优化器的参数了
         betas = (args.b1, args.b2) if args.load is None else None
         weight_decay = args.weight_decay if args.load is None else None
         lr = args.learning_rate if args.load is None else None
@@ -124,14 +124,14 @@ if __name__ == '__main__':
 
         net.teach(
             utkface_path=data_src,
-            batch_size=consts.BATCH_SIZE,
+            batch_size=consts.BATCH_SIZE,  # 128
             betas=betas,
-            epochs=args.epochs,
+            epochs=args.epochs,  # 200
             weight_decay=weight_decay,
             lr=lr,
             should_plot=args.sp,
             where_to_save=results_dest,
-            models_saving=args.models_saving
+            models_saving=args.models_saving  # 保存模式: 每个epoch都保存还是只保存最近一次或最后一次或都不保存
         )
 
     elif args.mode == 'test':
@@ -139,7 +139,7 @@ if __name__ == '__main__':
         assert os.path.isdir(args.input)
         input_root = args.input
         f = os.listdir(input_root)
-        assert f.__len__() >= 1
+        assert f.__len__() >= 1  # 至少得有一张图片
 
         if args.load is None:
             raise RuntimeError("Must provide path of trained models")
