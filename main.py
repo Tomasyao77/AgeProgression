@@ -88,7 +88,7 @@ if __name__ == '__main__':
                         help='Training dataset path (default is {}) or testing image path'.format(
                             default_train_results_dir()))  # ?不对吧
     parser.add_argument('--output', '-o', default='')
-    parser.add_argument('-z', dest='z_channels', default=50, type=int, help='Length of Z vector')
+    parser.add_argument('-z', dest='z_channels', default=100, type=int, help='Length of Z vector')
     args = parser.parse_args()
 
     consts.NUM_Z_CHANNELS = args.z_channels

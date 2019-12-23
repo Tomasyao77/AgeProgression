@@ -146,7 +146,7 @@ class DiscriminatorImg(nn.Module):
             )
         )
 
-    def forward(self, imgs, labels, device): #labels: [batch_size, 20]
+    def forward(self, imgs, labels, device):  # labels: [batch_size, 20]
         out = imgs
         # print("输入", out.shape)
         # run convs
@@ -365,7 +365,7 @@ class Net(object):
     def teach(
             self,
             utkface_path,
-            batch_size=64,
+            batch_size=128,
             epochs=1,
             weight_decay=1e-5,
             lr=2e-4,
@@ -384,11 +384,17 @@ class Net(object):
         train_dataset, valid_dataset = torch.utils.data.random_split(dataset, (len(dataset) - valid_size, valid_size))
 
         train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
-        valid_loader = DataLoader(dataset=valid_dataset, batch_size=batch_size, shuffle=False, drop_last=True)
-        idx_to_class = {v: k for k, v in dataset.class_to_idx.items()}
+        valid_loader = DataLoader(dataset=valid_dataset, batch_size=batch_size, shuffle=False, drop_last=False)
+        idx_to_class = {v: k for k, v in dataset.class_to_idx.items()}  # 骚操作
+        # print(dataset.class_to_idx)
+        # # {0: '0.0', 1: '0.1', 2: '1.0', 3: '1.1', 4: '2.0', 5: '2.1', 6: '3.0',
+        # #  7: '3.1', 8: '4.0', 9: '4.1', 10: '5.0', 11: '5.1', 12: '6.0', 13: '6.1',
+        # #  14: '7.0', 15: '7.1', 16: '8.0', 17: '8.1', 18: '9.0', 19: '9.1'}
+        # print(idx_to_class)
+        # exit(1)
 
         input_output_loss = l1_loss
-        nrow = round((2 * batch_size) ** 0.5)  # 我知道了 原图与生成图合并图的矩阵维度
+        nrow = round((2 * batch_size) ** 0.5)  # 我知道了 原图与生成图合并图的矩阵维度 16*16=256
 
         # save_image_normalized(tensor=validate_images, filename=where_to_save+"/base.png")
 
@@ -431,17 +437,27 @@ class Net(object):
                         images = images.to(device=self.device)
                         labels = torch.stack([str_to_tensor(idx_to_class[l], normalize=True) for l in
                                               list(labels.numpy())])  # todo - can remove list() ?
+                        # print(labels.shape)  # [128, 20]
+                        # exit(1)
                         labels = labels.to(device=self.device)
-                        # print ("DEBUG: iteration: "+str(i)+" images shape: "+str(images.shape))
+                        # print ("iteration: "+str(i)+" images shape: "+str(images.shape)) # [128, 3, 128, 128]
+                        # exit(1)
                         z = self.E(images)
+                        # print(z.shape) # [128, 100]
+                        # exit(1)
 
                         # Input\Output Loss
                         z_l = torch.cat((z, labels), 1)
+                        # print(z_l.shape)  # [128, 120]
+                        # exit(1)
                         generated = self.G(z_l)
-                        eg_loss = input_output_loss(generated, images)  # 顺序是不是反了 --鄙人疑虑?
+                        # print(generated.shape)  # [128, 3, 128, 128]
+                        # exit(1)
+                        # eg_loss = input_output_loss(generated, images)  # 顺序是不是反了 --鄙人疑虑?
+                        eg_loss = input_output_loss(images, generated)  # input target
                         losses['eg'].append(eg_loss.item())
 
-                        # Total Variance Regularization Loss !!!???
+                        # Total Variance Regularization Loss !!!??? 全变分损失，可以是图像更平滑
                         reg = l1_loss(generated[:, :, :, :-1], generated[:, :, :, 1:]) + l1_loss(
                             generated[:, :, :-1, :],
                             generated[:, :, 1:, :])

@@ -1,6 +1,7 @@
 #! /bin/bash
 #项目根目录
-basepath="/media/d9lab/data11/tomasyao/workspace/pycharm_ws/AgeProgression"
+#basepath="/media/d9lab/data11/tomasyao/workspace/pycharm_ws/AgeProgression"
+basepath="/media/zouy/workspace/gitcloneroot/AgeProgression"
 DATE=`date +%Y%m%d_%H%M%S`
 
 data_dir=${basepath}/data_dir/morph2
@@ -28,10 +29,10 @@ if [ $1 = "train" ]
 then
 	#后台运行训练代码
 	echo "train..."
-	source activate torchg
+	source activate torch
 	cd ${basepath}
-	setsid python ./main.py --ms=never --mode=train -e=${epochs} --output=${output} > ${logs} 2>&1 &
-#	python ./main.py --ms=tail --mode=train -e=${epochs} --output=${output}
+#	setsid python ./main.py --ms=never --mode=train -e=${epochs} --output=${output} > ${logs} 2>&1 &
+	python ./main.py --ms=never --mode=train -e=${epochs} --output=${output}
 elif [ $1 = "test" ]
 then
 	echo "test..."

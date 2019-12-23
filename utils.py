@@ -40,6 +40,7 @@ pil_to_model_tensor_transform = transforms.Compose(
 def get_utkface_dataset(root):
     print(root)
     # 有标签的 0.0表示第0个年龄段 男性
+    # 哦我知道了标签0到9刚好10段，感觉这还是分组学习，学习到每个年龄端的特征
     ret = lambda: ImageFolder(os.path.join(root, 'labeled'), transform=pil_to_model_tensor_transform)
     try:
         return ret()
