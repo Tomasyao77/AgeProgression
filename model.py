@@ -380,6 +380,7 @@ class Net(object):
             valid_size=None,
             where_to_save=None,
             models_saving='always',
+            reg_loss_ratio=0.0
     ):
         print("开始训练时间：")
         start_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
@@ -465,8 +466,7 @@ class Net(object):
                         eg_loss = input_output_loss(images, generated)  # input target
                         losses['eg'].append(eg_loss.item())
 
-                        # Total Variance Regularization Loss !!!??? 全变分损失，可以使图像更平滑
-                        # 看不懂
+                        # Total Variance Regularization Loss 全变分损失，可以使图像更平滑
                         reg = l1_loss(generated[:, :, :, :-1], generated[:, :, :, 1:]) + l1_loss(
                             generated[:, :, :-1, :],
                             generated[:, :, 1:, :])
@@ -475,7 +475,7 @@ class Net(object):
                         #        torch.sum(torch.abs(generated[:, :, :, :-1] - generated[:, :, :, 1:])) +
                         #        torch.sum(torch.abs(generated[:, :, :-1, :] - generated[:, :, 1:, :]))
                         # ) / float(generated.size(0))
-                        reg_loss = 0 * reg  # 乘以0干嘛?是暂时不用吗
+                        reg_loss = reg_loss_ratio * reg  # 乘以0干嘛?是暂时不用吗
                         reg_loss.to(self.device)
                         losses['reg'].append(reg_loss.item())
 

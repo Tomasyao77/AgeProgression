@@ -14,6 +14,7 @@ from torchvision.datasets.folder import pil_loader
 import gc
 import torch
 from tqdm import tqdm
+import time
 
 gc.collect()
 
@@ -122,17 +123,22 @@ if __name__ == '__main__':
             os.remove(log_path)
         logging.basicConfig(filename=log_path, level=logging.DEBUG)
 
-        net.teach(
-            utkface_path=data_src,
-            batch_size=consts.BATCH_SIZE,  # 128
-            betas=betas,
-            epochs=args.epochs,  # 200
-            weight_decay=weight_decay,
-            lr=lr,
-            should_plot=args.sp,
-            where_to_save=results_dest,
-            models_saving=args.models_saving  # 保存模式: 每个epoch都保存还是只保存最近一次或最后一次或都不保存
-        )
+        #####################################################################################
+        reg_loss_ratio_arr = [0.0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0]
+        for item in reg_loss_ratio_arr:
+            net.teach(
+                utkface_path=data_src,
+                batch_size=consts.BATCH_SIZE,  # 128
+                betas=betas,
+                epochs=args.epochs,  # 200
+                weight_decay=weight_decay,
+                lr=lr,
+                should_plot=args.sp,
+                where_to_save=results_dest,
+                models_saving=args.models_saving,  # 保存模式: 每个epoch都保存还是只保存最近一次或最后一次或都不保存
+                reg_loss_ratio=item
+            )
+            time.sleep(180)
 
     elif args.mode == 'test':
 

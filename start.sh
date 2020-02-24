@@ -15,7 +15,7 @@ output=${basepath}/output_dir
 output_test=${basepath}/output_dir_test
 input_test=${basepath}/input_test
 load_dat=${basepath}/output_dir/epoch60
-epochs=200
+epochs=50
 
 if [ $# -ne 1 ] #有且仅有一个参数，否则退出
 then
@@ -32,7 +32,7 @@ then
 	source activate torch
 	cd ${basepath}
 #	setsid python ./main.py --ms=never --mode=train -e=${epochs} --output=${output} > ${logs} 2>&1 &
-	python ./main.py --ms=never --mode=train -e=${epochs} --output=${output}
+	python ./main.py --ms=tail --mode=train -e=${epochs} --output=${output}
 elif [ $1 = "test" ]
 then
 	echo "test..."
