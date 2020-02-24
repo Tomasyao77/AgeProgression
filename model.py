@@ -310,22 +310,28 @@ class Net(object):
     def test_single(self, image_tensor, age, gender, target, watermark, load=None, img_name=None):
 
         self.eval()
-        # ? (10,1,1,1)
+        # image_tensor [1, 3, 128, 128] repeat -> [10, 3, 128, 128]
         batch = image_tensor.repeat(consts.NUM_AGES, 1, 1, 1).to(device=self.device)  # N x D x H x W
+        # [10, 100]
         z = self.E(batch)  # N x Z
 
         gender_tensor = -torch.ones(consts.NUM_GENDERS)
         gender_tensor[int(gender)] *= -1
+        # gender_tensor [2] repeat -> [10, 10] 牛皮
         gender_tensor = gender_tensor.repeat(consts.NUM_AGES,
                                              consts.NUM_AGES // consts.NUM_GENDERS)  # apply gender on all images
 
+        # age_tensor [10, 10]
         age_tensor = -torch.ones(consts.NUM_AGES, consts.NUM_AGES)
-        for i in range(consts.NUM_AGES):
+        for i in range(consts.NUM_AGES): # 10 厉害了
             age_tensor[i][i] *= -1  # apply the i'th age group on the i'th image
 
+        # cat((10, 10), (10, 10)) -> [10, 20]
         l = torch.cat((age_tensor, gender_tensor), 1).to(self.device)
+        # cat((10, 100), (10, 20)) -> [10, 120]
         z_l = torch.cat((z, l), 1)
 
+        # [10, 3, 128, 128]
         generated = self.G(z_l)
 
         if watermark:
@@ -435,6 +441,8 @@ class Net(object):
                     for i, (images, labels) in enumerate(_tqdm, 1):
                         # for i, (images, labels) in tqdm(enumerate(train_loader, 1)):
                         images = images.to(device=self.device)
+                        # stack(默认dim=0)就是把多个一维向量(这里)堆叠起来成为二维数组(batch)
+                        # 年龄和性别标签
                         labels = torch.stack([str_to_tensor(idx_to_class[l], normalize=True) for l in
                                               list(labels.numpy())])  # todo - can remove list() ?
                         # print(labels.shape)  # [128, 20]
@@ -457,7 +465,8 @@ class Net(object):
                         eg_loss = input_output_loss(images, generated)  # input target
                         losses['eg'].append(eg_loss.item())
 
-                        # Total Variance Regularization Loss !!!??? 全变分损失，可以是图像更平滑
+                        # Total Variance Regularization Loss !!!??? 全变分损失，可以使图像更平滑
+                        # 看不懂
                         reg = l1_loss(generated[:, :, :, :-1], generated[:, :, :, 1:]) + l1_loss(
                             generated[:, :, :-1, :],
                             generated[:, :, 1:, :])
@@ -466,22 +475,24 @@ class Net(object):
                         #        torch.sum(torch.abs(generated[:, :, :, :-1] - generated[:, :, :, 1:])) +
                         #        torch.sum(torch.abs(generated[:, :, :-1, :] - generated[:, :, 1:, :]))
                         # ) / float(generated.size(0))
-                        reg_loss = 0 * reg  # 乘以0干嘛?
+                        reg_loss = 0 * reg  # 乘以0干嘛?是暂时不用吗
                         reg_loss.to(self.device)
                         losses['reg'].append(reg_loss.item())
 
                         # DiscriminatorZ Loss
-                        # 这个损失不好理解
+                        # 这个损失不好理解!?
                         # torch.rand_like返回跟input的tensor一样size的0-1随机数
-                        z_prior = two_sided(torch.rand_like(z, device=self.device))  # [-1 : 1]?
+                        z_prior = two_sided(torch.rand_like(z, device=self.device))  # [-1 : 1]
                         d_z_prior = self.Dz(z_prior)
                         d_z = self.Dz(z)
+                        # bce_with_logits_loss 二分类交叉熵计算
                         dz_loss_prior = bce_with_logits_loss(d_z_prior, torch.ones_like(d_z_prior))
                         dz_loss = bce_with_logits_loss(d_z, torch.zeros_like(d_z))
                         dz_loss_tot = (dz_loss + dz_loss_prior)
                         losses['dz'].append(dz_loss_tot.item())
 
                         # Encoder\DiscriminatorZ Loss
+                        # 为什么这就是ez_loss呢?我看曲线图就是一条0线 懂了z就是E生成的
                         ez_loss = 0.0001 * bce_with_logits_loss(d_z, torch.ones_like(d_z))
                         ez_loss.to(self.device)
                         losses['ez'].append(ez_loss.item())
@@ -496,6 +507,7 @@ class Net(object):
                         losses['di'].append(di_loss_tot.item())
 
                         # Generator\DiscriminatorImg Loss
+                        # d_i_output就是Dimg(generated)生成的
                         dg_loss = 0.0001 * bce_with_logits_loss(d_i_output, torch.ones_like(d_i_output))
                         losses['dg'].append(dg_loss.item())
 
@@ -563,9 +575,11 @@ class Net(object):
 
                             loss = input_output_loss(images, generated)
 
+                            # merge_images [128, 3, 128, 128] -> [128*2, 3, 128, 128]
                             joined = merge_images(images, generated)  # torch.cat((generated, images), 0)
 
                             file_name = os.path.join(where_to_save_epoch, 'validation.png')
+                            # save_image_normalized 保存成一张图原图右边接着生成图 调用的是第三方函数save_image
                             save_image_normalized(tensor=joined, filename=file_name, nrow=nrow)
 
                             losses['valid'].append(loss.item())
@@ -599,10 +613,11 @@ class Net(object):
 
         # 代码训练完毕
         print("结束训练时间: ")
-        end_time = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(time.time()))
+        end_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(time.time()))
         print(end_time)
         print("训练耗时: " + smtp.date_gap(start_time, end_time))
         smtp.main(dict_={"epochs: ": epochs,
+                         "project: ": "AgeProgression",
                          "训练耗时: ": smtp.date_gap(start_time, end_time)})
 
     def _mass_fn(self, fn_name, *args, **kwargs):
