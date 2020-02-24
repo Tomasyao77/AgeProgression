@@ -21,10 +21,12 @@ def save_image_normalized(*args, **kwargs):
 
 
 def two_sided(x):
+    # [0: 1] -> [-1: 1] 零点的两边
     return 2 * (x - 0.5)
 
 
 def one_sided(x):
+    # [-1: 1] -> [0: 1] 零点的一边
     return (x + 1) / 2
 
 
@@ -99,11 +101,11 @@ def get_fgnet_person_loader(root):
 
 def str_to_tensor(text, normalize=False):
     age_group, gender = text.split('.')
-    age_tensor = -torch.ones(consts.NUM_AGES)
-    age_tensor[int(age_group)] *= -1
-    gender_tensor = -torch.ones(consts.NUM_GENDERS)
+    age_tensor = -torch.ones(consts.NUM_AGES)  # 10
+    age_tensor[int(age_group)] *= -1  # 变成正数
+    gender_tensor = -torch.ones(consts.NUM_GENDERS)  # 2
     gender_tensor[int(gender)] *= -1
-    if normalize:
+    if normalize:  # 扩展 最后result长度为20
         gender_tensor = gender_tensor.repeat(consts.NUM_AGES // consts.NUM_GENDERS)
     result = torch.cat((age_tensor, gender_tensor), 0)
     return result
@@ -118,15 +120,16 @@ class Label(namedtuple('Label', ('age', 'gender'))):
         return '%d.%d' % (self.age_group, self.gender)
 
     @staticmethod
+    # 共10个年龄段0-80岁
     def age_transform(age):
         age -= 1
         if age < 20:
             # first 4 age groups are for kids <= 20, 5 years intervals
-            # 0-4 5-9 10-14 15-19
+            # 0-5 6-10 11-15 16-20
             return max(age // 5, 0)
         else:
             # last (6?) age groups are for adults > 20, 10 years intervals
-            # 20-29 30-39 40-49 50-59 60-69 70-79
+            # 21-30 31-40 41-50 51-60 61-70 71-80
             return min(4 + (age - 20) // 10, consts.NUM_AGES - 1)
 
     def to_tensor(self, normalize=False):
@@ -304,6 +307,7 @@ def remove_trained(folder):
 
 
 def merge_images(batch1, batch2):
+    # [128, 3, 128, 128]
     assert batch1.shape == batch2.shape
     merged = torch.zeros(batch1.size(0) * 2, batch1.size(1), batch1.size(2), batch1.size(3), dtype=batch1.dtype)
     for i, (image1, image2) in enumerate(zip(batch1, batch2)):

@@ -7,7 +7,7 @@ import numpy as np
 
 
 def log():
-    log_path = "../logs/20191205_184501_UTKFace_train_log"
+    log_path = "../logs/20191207_093249_UTKFace_train_log"
     log_refine_path = log_path + "1"
     f = open(log_path, "r")
     if os.path.isfile(log_refine_path):
@@ -15,15 +15,17 @@ def log():
     w = open(log_refine_path, "a")
     y = []
     lines = f.readlines()  # 读取全部内容
+    count = 0 #x y对应的数量 自动统计更灵活点
     for line in lines:
         if 'Loss:' in line:
+            count += 1
             w.write(line)
             y.append(float(line.replace("\n", "").split(" ")[-1]))
             # print(line)
 
     f.close()
     w.close()
-    x = np.linspace(1, 50, 50, endpoint=True)
+    x = np.linspace(1, count, count, endpoint=True)
     print(y)
     plot(x, y, )
 
